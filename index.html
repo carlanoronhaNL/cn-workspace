@@ -947,8 +947,27 @@
             <textarea v-model="ex.colA" rows="4" placeholder="Coluna I — um elemento por linha" class="field-input" data-latex-target></textarea>
             <textarea v-model="ex.colB" rows="4" placeholder="Coluna II — um por linha, ordem baralhada" class="field-input" data-latex-target></textarea>
           </div>
+          <details class="border border-dashed border-[var(--line)] rounded-lg p-1.5" open>
+            <summary class="text-[9px] font-bold uppercase text-[var(--copper)] cursor-pointer">🖼️ Imagem deste exercício (opcional)</summary>
+            <div class="space-y-1.5 mt-1.5">
+              <div v-if="ex.imagem" class="flex items-center gap-2">
+                <img :src="ex.imagem" class="h-14 w-14 object-contain border border-[var(--line)] rounded bg-white">
+                <span class="text-[9px] text-slate-400 truncate flex-1">{{ ex.imagemNome }}</span>
+                <button @click="ex.imagem=''; ex.imagemNome=''" class="text-[10px] text-red-400">✕</button>
+              </div>
+              <input type="file" accept="image/png, image/jpeg, image/svg+xml" @change="handleItemImageUpload(ex, $event)" class="field-input">
+              <details>
+                <summary class="text-[9px] font-bold uppercase text-slate-400 cursor-pointer">📚 Escolher da Biblioteca ({{ imageLibrary.filter(im=>im.discipline===ficha.discipline).length }} em {{ ficha.discipline }})</summary>
+                <div class="grid grid-cols-4 gap-1.5 mt-1.5 max-h-32 overflow-y-auto">
+                  <img v-for="img in imageLibrary.filter(im=>im.discipline===ficha.discipline)" :key="img.id" :src="img.dataURL" :title="img.codigo+' — '+img.name"
+                       class="h-14 w-full object-cover rounded cursor-pointer border border-[var(--line)] hover:border-[var(--gold)]"
+                       @click="ex.imagem=img.dataURL; ex.imagemNome=img.codigo||img.name||'imagem.png'">
+                </div>
+              </details>
+            </div>
+          </details>
         </div>
-        <button @click="ficha.m2.exercises.push({difficulty:3, statement:'', assoc:false, colA:'', colB:''})" class="w-full text-[10px] font-bold border border-dashed border-[var(--line)] py-1.5 rounded-lg text-[var(--ink-soft)]">+ Adicionar exercício</button>
+        <button @click="ficha.m2.exercises.push({difficulty:3, statement:'', assoc:false, colA:'', colB:'', imagem:'', imagemNome:''})" class="w-full text-[10px] font-bold border border-dashed border-[var(--line)] py-1.5 rounded-lg text-[var(--ink-soft)]">+ Adicionar exercício</button>
       </div>
 
       <div v-if="ficha.model===3" class="panel space-y-2">
@@ -960,10 +979,36 @@
       </div>
 
       <div v-if="ficha.model===4" class="panel space-y-2">
-        <div><label class="field-label">Enunciado (usa ____(a)____)</label><textarea v-model="ficha.m4.problem" rows="3" class="field-input" data-latex-target></textarea></div>
-        <div><label class="field-label">Opções (a)</label><input v-model="ficha.m4.opA" class="field-input"></div>
-        <div><label class="field-label">Opções (b)</label><input v-model="ficha.m4.opB" class="field-input"></div>
-        <div><label class="field-label">Opções (c)</label><input v-model="ficha.m4.opC" class="field-input"></div>
+        <div v-for="(it,i) in ficha.m4.itens" :key="it.id||i" class="border border-[var(--line)] rounded-lg p-2 space-y-1.5">
+          <div class="flex items-center justify-between">
+            <label class="field-label mb-0">Item {{ i+1 }}</label>
+            <button v-if="ficha.m4.itens.length>1" @click="ficha.m4.itens.splice(i,1)" class="text-[10px] text-red-500">✕</button>
+          </div>
+          <div><label class="field-label">Enunciado (usa ____(a)____)</label><textarea v-model="it.problem" rows="3" class="field-input" data-latex-target></textarea></div>
+          <div><label class="field-label">Opções (a)</label><input v-model="it.opA" class="field-input"></div>
+          <div><label class="field-label">Opções (b)</label><input v-model="it.opB" class="field-input"></div>
+          <div><label class="field-label">Opções (c)</label><input v-model="it.opC" class="field-input"></div>
+          <details class="border border-dashed border-[var(--line)] rounded-lg p-1.5" open>
+            <summary class="text-[9px] font-bold uppercase text-[var(--copper)] cursor-pointer">🖼️ Imagem deste item (opcional)</summary>
+            <div class="space-y-1.5 mt-1.5">
+              <div v-if="it.imagem" class="flex items-center gap-2">
+                <img :src="it.imagem" class="h-14 w-14 object-contain border border-[var(--line)] rounded bg-white">
+                <span class="text-[9px] text-slate-400 truncate flex-1">{{ it.imagemNome }}</span>
+                <button @click="it.imagem=''; it.imagemNome=''" class="text-[10px] text-red-400">✕</button>
+              </div>
+              <input type="file" accept="image/png, image/jpeg, image/svg+xml" @change="handleItemImageUpload(it, $event)" class="field-input">
+              <details>
+                <summary class="text-[9px] font-bold uppercase text-slate-400 cursor-pointer">📚 Escolher da Biblioteca ({{ imageLibrary.filter(im=>im.discipline===ficha.discipline).length }} em {{ ficha.discipline }})</summary>
+                <div class="grid grid-cols-4 gap-1.5 mt-1.5 max-h-32 overflow-y-auto">
+                  <img v-for="img in imageLibrary.filter(im=>im.discipline===ficha.discipline)" :key="img.id" :src="img.dataURL" :title="img.codigo+' — '+img.name"
+                       class="h-14 w-full object-cover rounded cursor-pointer border border-[var(--line)] hover:border-[var(--gold)]"
+                       @click="it.imagem=img.dataURL; it.imagemNome=img.codigo||img.name||'imagem.png'">
+                </div>
+              </details>
+            </div>
+          </details>
+        </div>
+        <button @click="ficha.m4.itens.push({id:'m4a'+Date.now()+Math.random().toString(36).slice(2,6), problem:'', opA:'', opB:'', opC:'', imagem:'', imagemNome:''})" class="w-full text-[10px] font-bold border border-dashed border-[var(--line)] py-1.5 rounded-lg text-[var(--ink-soft)]">+ Adicionar item</button>
       </div>
 
       <div v-if="ficha.model===6" class="panel space-y-2">
@@ -1062,7 +1107,7 @@
               <input v-model="it.correspondencias" placeholder="Correspondências corretas (só versão PROFESSOR) — ex: 1-B; 2-C; 3-A" class="field-input">
             </template>
             <textarea v-model="it.resolucao" rows="2" placeholder="Resolução / critérios de correção (só aparece na versão PROFESSOR)" class="field-input" data-latex-target></textarea>
-            <details class="border border-dashed border-[var(--line)] rounded-lg p-1.5">
+            <details class="border border-dashed border-[var(--line)] rounded-lg p-1.5" open>
               <summary class="text-[9px] font-bold uppercase text-[var(--copper)] cursor-pointer">🖼️ Imagem deste item (opcional)</summary>
               <div class="space-y-1.5 mt-1.5">
                 <div v-if="it.imagem" class="flex items-center gap-2">
@@ -1260,12 +1305,13 @@
               </template>
               <template v-else-if="ficha.model===2">
                 <h1 class="text-sm font-bold font-serif-cn">{{ ficha.m2.title }}</h1>
-                <div v-for="(ex,i) in ficha.m2.exercises" :key="i" class="border-b border-slate-100 pb-2">
+                <div v-for="(ex,i) in ficha.m2.exercises" :key="i" class="cn-m5-item border-b border-slate-100 pb-2">
                   <div class="flex gap-2">
                     <span class="text-xs font-bold text-slate-400">{{ i+1 }}.</span>
                     <div class="text-xs flex-1 md-body" v-html="mdCN(ex.statement)"></div>
                     <span class="text-[9px] text-amber-500 whitespace-nowrap">{{ '★'.repeat(ex.difficulty) }}</span>
                   </div>
+                  <img v-if="ex.imagem" :src="ex.imagem" class="cn-enunciado-img">
                   <div v-if="ex.assoc" class="grid grid-cols-2 gap-3 text-xs mt-1.5 pl-5">
                     <div>
                       <div class="font-bold text-[9px] uppercase tracking-wider text-slate-400 mb-1">Coluna I</div>
@@ -1297,14 +1343,20 @@
               </template>
               <template v-else-if="ficha.model===4">
                 <h1 class="text-xs font-bold font-serif-cn uppercase">Itens de Seleção por Completamento</h1>
-                <div class="text-xs" v-html="m4FormattedProblem"></div>
-                <table class="w-full text-left border border-slate-400 text-xs mt-2"><thead><tr class="bg-slate-50 border-b border-slate-400 font-bold">
-                  <th class="p-2 border-r border-slate-400 text-center">(a)</th><th class="p-2 border-r border-slate-400 text-center">(b)</th><th class="p-2 text-center">(c)</th>
-                </tr></thead><tbody><tr>
-                  <td class="p-2 border-r border-slate-300 align-top"><div v-for="(o,i) in ficha.m4.opA.split(',')" :key="i">({{i+1}}) {{o.trim()}}</div></td>
-                  <td class="p-2 border-r border-slate-300 align-top"><div v-for="(o,i) in ficha.m4.opB.split(',')" :key="i">({{i+1}}) {{o.trim()}}</div></td>
-                  <td class="p-2 align-top"><div v-for="(o,i) in ficha.m4.opC.split(',')" :key="i">({{i+1}}) {{o.trim()}}</div></td>
-                </tr></tbody></table>
+                <div v-for="(it,i) in ficha.m4.itens" :key="it.id||i" class="cn-m5-item mb-3 pb-2 border-b border-slate-100">
+                  <div class="flex gap-2">
+                    <span class="text-xs font-bold text-slate-400">{{ i+1 }}.</span>
+                    <div class="text-xs flex-1" v-html="m4FormatarProblema(it.problem)"></div>
+                  </div>
+                  <img v-if="it.imagem" :src="it.imagem" class="cn-enunciado-img">
+                  <table class="w-full text-left border border-slate-400 text-xs mt-2"><thead><tr class="bg-slate-50 border-b border-slate-400 font-bold">
+                    <th class="p-2 border-r border-slate-400 text-center">(a)</th><th class="p-2 border-r border-slate-400 text-center">(b)</th><th class="p-2 text-center">(c)</th>
+                  </tr></thead><tbody><tr>
+                    <td class="p-2 border-r border-slate-300 align-top"><div v-for="(o,oi) in it.opA.split(',')" :key="oi">({{oi+1}}) {{o.trim()}}</div></td>
+                    <td class="p-2 border-r border-slate-300 align-top"><div v-for="(o,oi) in it.opB.split(',')" :key="oi">({{oi+1}}) {{o.trim()}}</div></td>
+                    <td class="p-2 align-top"><div v-for="(o,oi) in it.opC.split(',')" :key="oi">({{oi+1}}) {{o.trim()}}</div></td>
+                  </tr></tbody></table>
+                </div>
               </template>
               <template v-else-if="ficha.model===6">
                 <template v-for="(bl,bi) in ficha.m6.blocos" :key="bi">
@@ -2426,6 +2478,7 @@
         </div>
         <textarea v-model="imgTecForm.svg" spellcheck="false" class="w-full px-3 py-2 border border-[var(--line)] rounded-lg text-xs font-mono min-h-[140px] mb-3"></textarea>
         <div v-if="imgTecForm.svg" class="imgtec-preview border border-[var(--line)] rounded-xl mb-3" style="aspect-ratio:auto;min-height:140px" v-html="imgTecForm.svg"></div>
+        <p v-if="imgTecErro" class="text-[11px] font-bold text-red-600 mb-2">⚠️ {{ imgTecErro }}</p>
         <div class="flex gap-2">
           <button @click="guardarImgTec" class="text-xs font-bold bg-[var(--petrol)] text-white px-4 py-2 rounded-lg">Guardar</button>
           <button @click="imgTecForm=null" class="text-xs font-bold border border-[var(--line)] px-4 py-2 rounded-lg">Cancelar</button>
@@ -6206,7 +6259,7 @@ createApp({
         {difficulty:3, statement:'Mostra que $\\tan(\\beta)=\\frac{4}{\\overline{BD}}$.'}
       ]},
       m3:{problem:'Determina o declive da reta tangente ao gráfico de $f(x)=x^2$.', para:'Substituo o valor na função.', decide:'Escolho a regra de fatorização.', executa:'$$f\'(x)=\\lim_{h\\to0}\\frac{(x+h)^2-x^2}{h}=2x$$', verifica:'O declive faz sentido com o gráfico.'},
-      m4:{problem:'A média das TMB é ____(a)____ kcal/dia. Existem ____(b)____ mulheres no IIQ. A correlação é ____(c)____ ao valor de referência.', opA:'1351, 1374, 1379', opB:'3, 4, 5', opC:'inferior, igual, superior'},
+      m4:{itens:[{id:'m4a'+Date.now(), problem:'A média das TMB é ____(a)____ kcal/dia. Existem ____(b)____ mulheres no IIQ. A correlação é ____(c)____ ao valor de referência.', opA:'1351, 1374, 1379', opB:'3, 4, 5', opC:'inferior, igual, superior', imagem:'', imagemNome:''}]},
       m5:{
         title:'Prova Modelo 1', duracao:'90 minutos', viewMode:'aluno', showFormulario:false, formulario:'',
         items:[
@@ -6293,6 +6346,11 @@ createApp({
         ficha.m5.items[0].imagem = ficha.image;
         ficha.m5.items[0].imagemNome = ficha.imageName || 'imagem.png';
         ficha.image = ''; ficha.imageName = '';
+      }
+      // migração: modelo 4 (Completar) passou de um único problema para uma lista de itens
+      if (ficha.m4 && !Array.isArray(ficha.m4.itens) && ficha.m4.problem !== undefined) {
+        const antigo = { id: 'm4a'+Date.now(), problem: ficha.m4.problem||'', opA: ficha.m4.opA||'', opB: ficha.m4.opB||'', opC: ficha.m4.opC||'', imagem: ficha.m4.image||'', imagemNome: ficha.m4.imageName||'' };
+        ficha.m4 = { itens: [antigo] };
       }
     } catch(e) {}
     let rascunhoTimer = null;
@@ -7072,10 +7130,12 @@ createApp({
       });
       return out;
     }
-    const m4FormattedProblem = computed(()=> mdCN(ficha.m4.problem)
-      .replace(/____\(a\)____/g,'<b class="text-[var(--gold)] underline">(a)</b>')
-      .replace(/____\(b\)____/g,'<b class="text-[var(--gold)] underline">(b)</b>')
-      .replace(/____\(c\)____/g,'<b class="text-[var(--gold)] underline">(c)</b>'));
+    function m4FormatarProblema(problem){
+      return mdCN(problem||'')
+        .replace(/____\(a\)____/g,'<b class="text-[var(--gold)] underline">(a)</b>')
+        .replace(/____\(b\)____/g,'<b class="text-[var(--gold)] underline">(b)</b>')
+        .replace(/____\(c\)____/g,'<b class="text-[var(--gold)] underline">(c)</b>');
+    }
 
     const cotacaoTotal = computed(()=> ficha.m5.items.reduce((s,it)=> s + (Number(it.cotacao)||0), 0));
 
@@ -7918,11 +7978,17 @@ createApp({
         tipo: tipoMap[diagram.category]||'Outro', variante:'Completa', svg: diagramSvg.value };
       tab.value = 'imgtec';
     }
-    function novaImgTec(){ imgTecForm.value = {id:null, area:'F', modulo:'', titulo:'', tipo:IMGTEC_TIPOS[0], variante:'Completa', svg:'', tags:''}; }
-    function editarImgTec(it){ imgTecSel.value = null; imgTecForm.value = {...it}; }
+    function novaImgTec(){ imgTecErro.value=''; imgTecForm.value = {id:null, area:'F', modulo:'', titulo:'', tipo:IMGTEC_TIPOS[0], variante:'Completa', svg:'', tags:''}; }
+    function editarImgTec(it){ imgTecErro.value=''; imgTecSel.value = null; imgTecForm.value = {...it}; }
+    const imgTecErro = ref('');
     function guardarImgTec(){
       const f = imgTecForm.value;
-      if(!f.titulo.trim()||!f.svg.trim()||!String(f.modulo).trim()){ alert('Preenche o módulo, o título e o código SVG.'); return; }
+      const emFalta = [];
+      if(!String(f.modulo).trim()) emFalta.push('o Módulo');
+      if(!f.titulo.trim()) emFalta.push('o Título');
+      if(!f.svg.trim()) emFalta.push('o código SVG (carrega uma foto ou cola o SVG)');
+      if(emFalta.length){ imgTecErro.value = 'Falta preencher: ' + emFalta.join(', ') + '.'; return; }
+      imgTecErro.value = '';
       if(f.id){
         const i = imgTecnicas.findIndex(x=>x.id===f.id);
         if(i>-1) imgTecnicas.splice(i,1,{...f, seed:false});
@@ -8010,7 +8076,7 @@ createApp({
       newExercicio, autoGen, currentExercicios, compatibleExercicios, addExercicio, removeExercicio, generateAutoFicha, exercisesForCodigo, insertExercicioIntoFicha,
       showAddModule, newModule, addModule, removeModule, renameModule, bulkModules, addModulesBulk,
       setDiscipline, addStudent, removeStudent, loadStudent, addCompetency, regeneratePlan, sendDorToFicha, useCompatibleExercicios,
-      ficha, nl2br, m4FormattedProblem, cotacaoTotal, insertLatex, latexKeys, fichaMediaSvg, fichaLatex, copyLatex, copyStatus, printFicha, handleFichaImageUpload, handleItemImageUpload,
+      ficha, nl2br, m4FormatarProblema, cotacaoTotal, insertLatex, latexKeys, fichaMediaSvg, fichaLatex, copyLatex, copyStatus, printFicha, handleFichaImageUpload, handleItemImageUpload,
       fichasRascunhos, rascunhoNomeAtual, rascunhoStatus, guardarRascunhoNomeado, abrirRascunhoNomeado, removerRascunhoNomeado,
       ecossistema, ecoSearch, newEco, resetEcoForm, saveEco, editEco, removeEco, filteredEco, estadoEcossistema, exportEcossistemaCN, importEcossistemaCN,
       catCN, catDots, gerarEstruturaCategoria, mdCN,
@@ -8029,7 +8095,7 @@ createApp({
       editorialSuggestions, applySuggestedCompetencia, goToSuggestedDiagram,
       physicsCats, chemCats, diagram, diagramSvg, chemPresets, renderMath,
       globalSearch, globalSearchOpen, globalResults, printResumo, printDeck, printTargetId, printDeckData,
-      imgTecnicas, imgTecSearch, imgTecArea, imgTecSel, imgTecForm, imgTecCopied, filteredImgTec, IMGTEC_TIPOS, imgTecCodigoPrevisto, carregarImagemImgTec, importarLoteImagensImgTec,
+      imgTecnicas, imgTecSearch, imgTecArea, imgTecSel, imgTecForm, imgTecErro, imgTecCopied, filteredImgTec, IMGTEC_TIPOS, imgTecCodigoPrevisto, carregarImagemImgTec, importarLoteImagensImgTec,
       novaImgTec, editarImgTec, guardarImgTec, enviarDiagramaParaImagens, apagarImgTec, duplicarImgTecMuda, reporImgTecSeeds, copiarImgTec,
       downloadImgTecSVG, downloadImgTecPNG, exportImgTec, importImgTec
     };
