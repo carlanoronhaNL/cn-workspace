@@ -208,6 +208,7 @@
       </div>
     </div>
     <button v-if="tab==='ficha'" @click="printFicha" class="text-xs font-bold bg-[var(--petrol)] text-white px-3 py-1.5 rounded-lg">Imprimir / PDF</button>
+    <button @click="abrirDiagnosticoArmazenamento" class="text-xs font-bold border border-[var(--line)] px-3 py-1.5 rounded-lg text-[var(--ink-soft)]" title="Ver o que está guardado e quanto espaço está a ser usado">🔧 Armazenamento</button>
   </header>
 
   <!-- ================= TAB 0 · ROADBOOK CN ================= -->
@@ -2486,6 +2487,48 @@
       </div>
     </div>
   </section>
+
+  <!-- ================= MODAL · DIAGNÓSTICO DE ARMAZENAMENTO ================= -->
+  <div v-if="diagStorageOpen" class="no-print" style="position:fixed;inset:0;background:rgba(20,25,30,0.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;">
+    <div style="background:#fff;border-radius:14px;max-width:640px;width:100%;max-height:85vh;overflow-y:auto;padding:20px;">
+      <div class="flex justify-between items-center mb-2">
+        <h2 class="font-serif-cn text-sm font-bold text-[var(--petrol)]">🔧 Diagnóstico de armazenamento</h2>
+        <button @click="diagStorageOpen=false" class="text-xs font-bold border border-[var(--line)] px-2.5 py-1 rounded-lg">✕ Fechar</button>
+      </div>
+      <p class="text-[10px] text-slate-400 mb-3">Mostra o que está guardado neste navegador (localStorage), para perceberes se alguma gravação falhou por falta de espaço.</p>
+
+      <div class="mb-3 p-2.5 rounded-lg" :style="storageDiag.pctUsado > 80 ? 'background:#fdecea;' : 'background:#f4f7f6;'">
+        <div class="flex justify-between text-[11px] font-bold mb-1">
+          <span>Uso total estimado</span>
+          <span :style="storageDiag.pctUsado > 80 ? 'color:#c0392b;' : 'color:var(--petrol);'">{{ storageDiag.totalKB }} KB de ~{{ storageDiag.limiteKB }} KB (~{{ storageDiag.pctUsado }}%)</span>
+        </div>
+        <p v-if="storageDiag.pctUsado > 80" class="text-[10px] font-bold" style="color:#c0392b;">⚠️ Estás perto do limite — novas gravações com imagens podem falhar em silêncio. Considera remover rascunhos antigos ou imagens não usadas.</p>
+      </div>
+
+      <div class="mb-3">
+        <div class="text-[10px] font-bold uppercase text-slate-400 mb-1">Auto-save da ficha atual</div>
+        <div class="text-xs border border-[var(--line)] rounded-lg p-2">
+          <div>Guardado às: <b>{{ storageDiag.auto.em || '—' }}</b></div>
+          <div>Nº de itens (Prova Modelo): <b>{{ storageDiag.auto.nItens }}</b></div>
+          <div>Itens com imagem: <b>{{ storageDiag.auto.nImagens }}</b></div>
+          <div>Tamanho: <b>{{ storageDiag.auto.kb }} KB</b></div>
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <div class="text-[10px] font-bold uppercase text-slate-400 mb-1">Rascunhos nomeados guardados ({{ storageDiag.nomeados.length }})</div>
+        <div v-if="!storageDiag.nomeados.length" class="text-[11px] italic text-slate-400">Nenhum rascunho nomeado guardado.</div>
+        <div v-for="r in storageDiag.nomeados" :key="r.nome+r.savedAt" class="text-xs border border-[var(--line)] rounded-lg p-2 mb-1.5">
+          <div class="font-bold">{{ r.nome }} <span class="font-normal text-slate-400">— {{ r.savedAt }}</span></div>
+          <div>Nº de itens: <b>{{ r.nItens }}</b> · Itens com imagem: <b>{{ r.nImagens }}</b> · Tamanho: <b>{{ r.kb }} KB</b></div>
+        </div>
+      </div>
+
+      <div class="text-[10px] text-slate-400 border-t border-[var(--line)] pt-2 mt-2">
+        Dica: se o auto-save tiver mais itens/imagens do que o rascunho nomeado que abriste, abre-o de novo (o auto-save carrega automaticamente ao abrir o Workspace) e volta a guardá-lo como rascunho nomeado.
+      </div>
+    </div>
+  </div>
 
 </div>
 
@@ -6299,7 +6342,44 @@ createApp({
     const rascunhoNomeAtual = ref('');
     const rascunhoIdAtual = ref(null);
     const rascunhoStatus = ref('');
-    function saveFichasRascunhos(){ localStorage.setItem(FICHAS_RASCUNHOS_KEY, JSON.stringify(fichasRascunhos)); }
+
+    // --- Diagnóstico de armazenamento (localStorage) ---
+    const diagStorageOpen = ref(false);
+    const storageDiag = reactive({ totalKB:0, limiteKB:5000, pctUsado:0, auto:{em:'',nItens:0,nImagens:0,kb:0}, nomeados:[] });
+    function contarItensImagem(snapshot){
+      const items = snapshot && snapshot.m5 && snapshot.m5.items;
+      if(!Array.isArray(items)) return {nItens:0, nImagens:0};
+      return { nItens: items.length, nImagens: items.filter(it=>it && it.imagem).length };
+    }
+    function abrirDiagnosticoArmazenamento(){
+      try {
+        const autoRaw = localStorage.getItem(FICHA_RASCUNHO_KEY);
+        const auto = autoRaw ? JSON.parse(autoRaw) : null;
+        const cAuto = contarItensImagem(auto && auto.snapshot);
+        storageDiag.auto = { em: auto ? auto.em : '', nItens: cAuto.nItens, nImagens: cAuto.nImagens, kb: Math.round((autoRaw||'').length/1024) };
+
+        const nomeadosRaw = localStorage.getItem(FICHAS_RASCUNHOS_KEY);
+        const nomeadosArr = nomeadosRaw ? JSON.parse(nomeadosRaw) : [];
+        storageDiag.nomeados = nomeadosArr.map(r => {
+          const c = contarItensImagem(r.snapshot);
+          return { nome: r.nome, savedAt: r.savedAt, nItens: c.nItens, nImagens: c.nImagens, kb: Math.round(JSON.stringify(r).length/1024) };
+        });
+
+        let total = 0;
+        for (let k in localStorage) { if (localStorage.hasOwnProperty(k)) total += (localStorage[k]||'').length; }
+        storageDiag.totalKB = Math.round(total/1024);
+        storageDiag.pctUsado = Math.min(100, Math.round(storageDiag.totalKB / storageDiag.limiteKB * 100));
+      } catch(e) {
+        storageDiag.auto = { em:'erro a ler', nItens:0, nImagens:0, kb:0 };
+        storageDiag.nomeados = [];
+      }
+      diagStorageOpen.value = true;
+    }
+
+    function saveFichasRascunhos(){
+      try { localStorage.setItem(FICHAS_RASCUNHOS_KEY, JSON.stringify(fichasRascunhos)); return true; }
+      catch(e){ return false; }
+    }
     function guardarRascunhoNomeado(){
       const nome = rascunhoNomeAtual.value.trim();
       if(!nome){ rascunhoStatus.value = 'Dá um nome ao rascunho primeiro.'; return; }
@@ -6314,8 +6394,12 @@ createApp({
         fichasRascunhos.unshift(novo);
         rascunhoIdAtual.value = novo.id;
       }
-      saveFichasRascunhos();
-      rascunhoStatus.value = '✓ Guardado às ' + agora.toTimeString().slice(0,5);
+      const ok = saveFichasRascunhos();
+      if(ok){
+        rascunhoStatus.value = '✓ Guardado às ' + agora.toTimeString().slice(0,5);
+      } else {
+        rascunhoStatus.value = '⚠️ FALHOU — sem espaço de armazenamento. As imagens grandes podem ser a causa; toca em "🔧 Armazenamento" no topo para ver o que ocupa espaço, e considera remover rascunhos antigos.';
+      }
     }
     function abrirRascunhoNomeado(r){
       Object.assign(ficha, JSON.parse(JSON.stringify(r.snapshot)));
@@ -6357,7 +6441,8 @@ createApp({
     watch(ficha, () => {
       clearTimeout(rascunhoTimer);
       rascunhoTimer = setTimeout(() => {
-        try { localStorage.setItem(FICHA_RASCUNHO_KEY, JSON.stringify({em: new Date().toISOString(), snapshot: ficha})); } catch(e) {}
+        try { localStorage.setItem(FICHA_RASCUNHO_KEY, JSON.stringify({em: new Date().toISOString(), snapshot: ficha})); }
+        catch(e) { rascunhoStatus.value = '⚠️ O auto-save falhou — sem espaço de armazenamento. Toca em "🔧 Armazenamento" no topo.'; }
       }, 800);
     }, {deep:true});
 
@@ -7166,12 +7251,39 @@ createApp({
       reader.onload = e=>{ ficha.image = e.target.result; ficha.imageName = file.name; };
       reader.readAsDataURL(file);
     }
+    function comprimirImagemFicheiro(file, maxDim, qualidade){
+      return new Promise((resolve, reject) => {
+        if (file.type === 'image/svg+xml') {
+          const r = new FileReader();
+          r.onload = e => resolve(e.target.result);
+          r.onerror = reject;
+          r.readAsDataURL(file);
+          return;
+        }
+        const img = new Image();
+        const reader = new FileReader();
+        reader.onload = e => { img.onload = () => {
+          let w = img.width, h = img.height;
+          const escala = Math.min(1, maxDim / Math.max(w, h));
+          w = Math.round(w * escala); h = Math.round(h * escala);
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', qualidade));
+        }; img.onerror = reject; img.src = e.target.result; };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
     function handleItemImageUpload(it, event){
       const file = event.target.files[0]; if(!file) return;
-      const reader = new FileReader();
-      reader.onload = e=>{ it.imagem = e.target.result; it.imagemNome = file.name; };
-      reader.readAsDataURL(file);
+      comprimirImagemFicheiro(file, 1000, 0.8).then(dataUrl => {
+        it.imagem = dataUrl; it.imagemNome = file.name;
+      }).catch(() => {
+        alert('Não foi possível processar esta imagem. Tenta outro ficheiro.');
+      });
     }
+
     function generateSVGTrig(type, angleDeg){
       const w=260,h=200,cx=100,cy=100,r=65;
       let svg=`<svg width="100%" height="100%" viewBox="0 0 ${w} ${h}">`;
@@ -8078,6 +8190,7 @@ createApp({
       setDiscipline, addStudent, removeStudent, loadStudent, addCompetency, regeneratePlan, sendDorToFicha, useCompatibleExercicios,
       ficha, nl2br, m4FormatarProblema, cotacaoTotal, insertLatex, latexKeys, fichaMediaSvg, fichaLatex, copyLatex, copyStatus, printFicha, handleFichaImageUpload, handleItemImageUpload,
       fichasRascunhos, rascunhoNomeAtual, rascunhoStatus, guardarRascunhoNomeado, abrirRascunhoNomeado, removerRascunhoNomeado,
+      diagStorageOpen, storageDiag, abrirDiagnosticoArmazenamento,
       ecossistema, ecoSearch, newEco, resetEcoForm, saveEco, editEco, removeEco, filteredEco, estadoEcossistema, exportEcossistemaCN, importEcossistemaCN,
       catCN, catDots, gerarEstruturaCategoria, mdCN,
       bancoItens, itemSearch, itemFilterTipo, itemFilterPensamento, newItem, resetItemForm, saveItem, editItem, removeItem, enviarItemParaBanco, enviarTodosParaBanco, bancoFichaSearch, bancoParaFicha, importarItemDoBanco, importarTodosDoBanco,
