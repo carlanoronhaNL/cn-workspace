@@ -2518,10 +2518,22 @@
       <div class="mb-3">
         <div class="text-[10px] font-bold uppercase text-slate-400 mb-1">Rascunhos nomeados guardados ({{ storageDiag.nomeados.length }})</div>
         <div v-if="!storageDiag.nomeados.length" class="text-[11px] italic text-slate-400">Nenhum rascunho nomeado guardado.</div>
-        <div v-for="r in storageDiag.nomeados" :key="r.nome+r.savedAt" class="text-xs border border-[var(--line)] rounded-lg p-2 mb-1.5">
-          <div class="font-bold">{{ r.nome }} <span class="font-normal text-slate-400">— {{ r.savedAt }}</span></div>
-          <div>Nº de itens: <b>{{ r.nItens }}</b> · Itens com imagem: <b>{{ r.nImagens }}</b> · Tamanho: <b>{{ r.kb }} KB</b></div>
+        <div v-for="r in storageDiag.nomeados" :key="r.nome+r.savedAt" class="text-xs border border-[var(--line)] rounded-lg p-2 mb-1.5 flex justify-between items-start gap-2">
+          <div>
+            <div class="font-bold">{{ r.nome }} <span class="font-normal text-slate-400">— {{ r.savedAt }}</span></div>
+            <div>Nº de itens: <b>{{ r.nItens }}</b> · Itens com imagem: <b>{{ r.nImagens }}</b> · Tamanho: <b>{{ r.kb }} KB</b></div>
+          </div>
+          <button @click="eliminarRascunhoNomeadoDiag(r.id)" class="text-[10px] font-bold text-red-600 border border-red-200 rounded-lg px-2 py-1 whitespace-nowrap">🗑️ Eliminar</button>
         </div>
+      </div>
+
+      <div class="mb-3">
+        <div class="text-[10px] font-bold uppercase text-slate-400 mb-1">O que ocupa espaço, por categoria</div>
+        <div v-for="b in storageDiag.breakdown" :key="b.key" class="flex justify-between text-xs py-1 border-b border-[var(--line)]">
+          <span>{{ b.label }}</span>
+          <span class="font-bold">{{ b.kb }} KB</span>
+        </div>
+        <p class="text-[10px] text-slate-400 mt-1">Para libertar espaço, vai ao separador correspondente (ex: "7 · Imagens Técnicas" ou "4 · Biblioteca CN") e apaga imagens ou fichas antigas que já não precises.</p>
       </div>
 
       <div class="text-[10px] text-slate-400 border-t border-[var(--line)] pt-2 mt-2">
@@ -6345,7 +6357,7 @@ createApp({
 
     // --- Diagnóstico de armazenamento (localStorage) ---
     const diagStorageOpen = ref(false);
-    const storageDiag = reactive({ totalKB:0, limiteKB:5000, pctUsado:0, auto:{em:'',nItens:0,nImagens:0,kb:0}, nomeados:[] });
+    const storageDiag = reactive({ totalKB:0, limiteKB:5000, pctUsado:0, auto:{em:'',nItens:0,nImagens:0,kb:0}, nomeados:[], breakdown:[] });
     function contarItensImagem(snapshot){
       const items = snapshot && snapshot.m5 && snapshot.m5.items;
       if(!Array.isArray(items)) return {nItens:0, nImagens:0};
@@ -6362,19 +6374,55 @@ createApp({
         const nomeadosArr = nomeadosRaw ? JSON.parse(nomeadosRaw) : [];
         storageDiag.nomeados = nomeadosArr.map(r => {
           const c = contarItensImagem(r.snapshot);
-          return { nome: r.nome, savedAt: r.savedAt, nItens: c.nItens, nImagens: c.nImagens, kb: Math.round(JSON.stringify(r).length/1024) };
+          return { id: r.id, nome: r.nome, savedAt: r.savedAt, nItens: c.nItens, nImagens: c.nImagens, kb: Math.round(JSON.stringify(r).length/1024) };
         });
 
+        const rotulos = {
+          CNW_FICHA_RASCUNHO: 'Auto-save da ficha atual',
+          CNW_FICHAS_RASCUNHOS: 'Rascunhos nomeados',
+          CNW_BACKLOG: 'Backlog / Dores dos alunos',
+          CNW_BANCO_ITENS: '6 · Banco CN de Itens',
+          CNW_BIBLIOTECA: '4 · Biblioteca CN (fichas)',
+          CNW_DB: 'Base de dados / registos',
+          CNW_DIAGRAMS: '3 · Diagramas',
+          CNW_ECOSSISTEMA: '5 · Ecossistema CN',
+          CNW_FLASHCARDS: 'Biblioteca · Flashcards',
+          CNW_FORMULARIOS: 'Biblioteca · Formulários',
+          CNW_IMAGES: 'Biblioteca · Imagens (resumos/fichas)',
+          CNW_IMG_TECNICAS: '7 · Imagens Técnicas',
+          CNW_RESUMOS: 'Biblioteca · Resumos',
+          CNW_STUDENTS: 'Alunos / Roadbook'
+        };
         let total = 0;
-        for (let k in localStorage) { if (localStorage.hasOwnProperty(k)) total += (localStorage[k]||'').length; }
+        const breakdown = [];
+        for (let k in localStorage) {
+          if (!localStorage.hasOwnProperty(k)) continue;
+          const kb = (localStorage[k]||'').length;
+          total += kb;
+          breakdown.push({ key: k, label: rotulos[k] || k, kb: Math.round(kb/1024) });
+        }
+        breakdown.sort((a,b) => b.kb - a.kb);
+        storageDiag.breakdown = breakdown;
         storageDiag.totalKB = Math.round(total/1024);
         storageDiag.pctUsado = Math.min(100, Math.round(storageDiag.totalKB / storageDiag.limiteKB * 100));
       } catch(e) {
         storageDiag.auto = { em:'erro a ler', nItens:0, nImagens:0, kb:0 };
         storageDiag.nomeados = [];
+        storageDiag.breakdown = [];
       }
       diagStorageOpen.value = true;
     }
+    function eliminarRascunhoNomeadoDiag(id){
+      if(!confirm('Eliminar este rascunho nomeado? Não pode ser desfeito.')) return;
+      const nomeadosRaw = localStorage.getItem(FICHAS_RASCUNHOS_KEY);
+      let arr = nomeadosRaw ? JSON.parse(nomeadosRaw) : [];
+      arr = arr.filter(r => r.id !== id);
+      localStorage.setItem(FICHAS_RASCUNHOS_KEY, JSON.stringify(arr));
+      const idx = fichasRascunhos.findIndex(r => r.id === id);
+      if(idx > -1) fichasRascunhos.splice(idx, 1);
+      abrirDiagnosticoArmazenamento();
+    }
+
 
     function saveFichasRascunhos(){
       try { localStorage.setItem(FICHAS_RASCUNHOS_KEY, JSON.stringify(fichasRascunhos)); return true; }
@@ -8190,7 +8238,7 @@ createApp({
       setDiscipline, addStudent, removeStudent, loadStudent, addCompetency, regeneratePlan, sendDorToFicha, useCompatibleExercicios,
       ficha, nl2br, m4FormatarProblema, cotacaoTotal, insertLatex, latexKeys, fichaMediaSvg, fichaLatex, copyLatex, copyStatus, printFicha, handleFichaImageUpload, handleItemImageUpload,
       fichasRascunhos, rascunhoNomeAtual, rascunhoStatus, guardarRascunhoNomeado, abrirRascunhoNomeado, removerRascunhoNomeado,
-      diagStorageOpen, storageDiag, abrirDiagnosticoArmazenamento,
+      diagStorageOpen, storageDiag, abrirDiagnosticoArmazenamento, eliminarRascunhoNomeadoDiag,
       ecossistema, ecoSearch, newEco, resetEcoForm, saveEco, editEco, removeEco, filteredEco, estadoEcossistema, exportEcossistemaCN, importEcossistemaCN,
       catCN, catDots, gerarEstruturaCategoria, mdCN,
       bancoItens, itemSearch, itemFilterTipo, itemFilterPensamento, newItem, resetItemForm, saveItem, editItem, removeItem, enviarItemParaBanco, enviarTodosParaBanco, bancoFichaSearch, bancoParaFicha, importarItemDoBanco, importarTodosDoBanco,
