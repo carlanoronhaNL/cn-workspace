@@ -2536,6 +2536,15 @@
         <p class="text-[10px] text-slate-400 mt-1">Para libertar espaço, vai ao separador correspondente (ex: "7 · Imagens Técnicas" ou "4 · Biblioteca CN") e apaga imagens ou fichas antigas que já não precises.</p>
       </div>
 
+      <div class="mb-3 p-2.5 rounded-lg" style="background:#f4f7f6;">
+        <div class="text-[10px] font-bold uppercase text-slate-400 mb-1">Comprimir sem apagar nada</div>
+        <p class="text-[10px] text-slate-500 mb-2">Reprocessa as imagens já guardadas na Biblioteca de Imagens Técnicas, reduzindo o tamanho sem perder o conteúdo (diagramas vetoriais puros não são afetados).</p>
+        <button @click="comprimirImagensTecnicasAntigas" :disabled="comprimindoImgTec" class="text-xs font-bold bg-[var(--petrol)] text-white px-3 py-1.5 rounded-lg disabled:opacity-50">
+          {{ comprimindoImgTec ? '⏳ A comprimir...' : '🗜️ Comprimir imagens antigas agora' }}
+        </button>
+        <p v-if="compressaoResultado" class="text-[11px] font-bold mt-1.5" style="color:var(--petrol);">{{ compressaoResultado }}</p>
+      </div>
+
       <div class="text-[10px] text-slate-400 border-t border-[var(--line)] pt-2 mt-2">
         Dica: se o auto-save tiver mais itens/imagens do que o rascunho nomeado que abriste, abre-o de novo (o auto-save carrega automaticamente ao abrir o Workspace) e volta a guardá-lo como rascunho nomeado.
       </div>
@@ -6422,6 +6431,42 @@ createApp({
       if(idx > -1) fichasRascunhos.splice(idx, 1);
       abrirDiagnosticoArmazenamento();
     }
+    const comprimindoImgTec = ref(false);
+    const compressaoResultado = ref('');
+    function recomprimirDataUrlEmbutido(svgStr, maxDim, qualidade){
+      return new Promise((resolve) => {
+        const m = svgStr.match(/href="(data:image\/(png|jpeg|jpg);base64,[^"]+)"/);
+        if(!m){ resolve(svgStr); return; }
+        const img = new Image();
+        img.onload = () => {
+          let w = img.width, h = img.height;
+          const escala = Math.min(1, maxDim / Math.max(w, h));
+          w = Math.round(w*escala); h = Math.round(h*escala);
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          const novoDataUrl = canvas.toDataURL('image/jpeg', qualidade);
+          resolve(svgStr.replace(m[1], novoDataUrl));
+        };
+        img.onerror = () => resolve(svgStr);
+        img.src = m[1];
+      });
+    }
+    async function comprimirImagensTecnicasAntigas(){
+      comprimindoImgTec.value = true;
+      const antesKB = Math.round(JSON.stringify(imgTecnicas).length/1024);
+      for(let i=0; i<imgTecnicas.length; i++){
+        const item = imgTecnicas[i];
+        if(item.svg && item.svg.length > 40000){
+          item.svg = await recomprimirDataUrlEmbutido(item.svg, 700, 0.72);
+        }
+      }
+      saveImgTec();
+      const depoisKB = Math.round(JSON.stringify(imgTecnicas).length/1024);
+      compressaoResultado.value = `Concluído: ${antesKB} KB → ${depoisKB} KB (poupou ${antesKB-depoisKB} KB).`;
+      comprimindoImgTec.value = false;
+      abrirDiagnosticoArmazenamento();
+    }
 
 
     function saveFichasRascunhos(){
@@ -8239,6 +8284,7 @@ createApp({
       ficha, nl2br, m4FormatarProblema, cotacaoTotal, insertLatex, latexKeys, fichaMediaSvg, fichaLatex, copyLatex, copyStatus, printFicha, handleFichaImageUpload, handleItemImageUpload,
       fichasRascunhos, rascunhoNomeAtual, rascunhoStatus, guardarRascunhoNomeado, abrirRascunhoNomeado, removerRascunhoNomeado,
       diagStorageOpen, storageDiag, abrirDiagnosticoArmazenamento, eliminarRascunhoNomeadoDiag,
+      comprimindoImgTec, compressaoResultado, comprimirImagensTecnicasAntigas,
       ecossistema, ecoSearch, newEco, resetEcoForm, saveEco, editEco, removeEco, filteredEco, estadoEcossistema, exportEcossistemaCN, importEcossistemaCN,
       catCN, catDots, gerarEstruturaCategoria, mdCN,
       bancoItens, itemSearch, itemFilterTipo, itemFilterPensamento, newItem, resetItemForm, saveItem, editItem, removeItem, enviarItemParaBanco, enviarTodosParaBanco, bancoFichaSearch, bancoParaFicha, importarItemDoBanco, importarTodosDoBanco,
